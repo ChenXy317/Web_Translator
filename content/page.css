@@ -1,0 +1,18 @@
+span.atp-bi {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: flex-start;
+  vertical-align: baseline;
+  gap: 0.12em;
+  line-height: 1.35;
+  margin: 0.05em 0;
+}
+
+span.atp-src {
+  opacity: 0.72;
+  font-size: 0.86em;
+}
+
+span.atp-dst {
+  font-weight: inherit;
+}

@@ -1,0 +1,154 @@
+:root {
+  --bg: #0c1222;
+  --elev: #141c31;
+  --line: #243049;
+  --text: #e8eefc;
+  --muted: #8b9bb8;
+  --accent: #3ee0b0;
+  --accent-dim: #1b3d36;
+  --danger: #ff6b7a;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  width: 340px;
+  background: var(--bg);
+  color: var(--text);
+  font: 13px/1.45 "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+
+body {
+  padding: 14px;
+}
+
+header {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-bottom: 14px;
+}
+
+header img {
+  border-radius: 8px;
+}
+
+header strong {
+  display: block;
+  font-size: 15px;
+}
+
+header span {
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.card, #main {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.hidden {
+  display: none !important;
+}
+
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--muted);
+}
+
+select, button {
+  font: inherit;
+}
+
+select {
+  width: 100%;
+  border: 1px solid var(--line);
+  background: var(--elev);
+  color: var(--text);
+  border-radius: 10px;
+  padding: 8px 10px;
+}
+
+.actions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+}
+
+button {
+  border: 1px solid var(--line);
+  background: var(--elev);
+  color: var(--text);
+  border-radius: 10px;
+  padding: 8px 10px;
+  cursor: pointer;
+}
+
+button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #06281f;
+  font-weight: 650;
+}
+
+button.ghost {
+  width: 100%;
+  background: transparent;
+}
+
+button:hover {
+  filter: brightness(1.08);
+}
+
+.switch {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  color: var(--text);
+}
+
+.progress {
+  height: 4px;
+  background: var(--line);
+  border-radius: 99px;
+  overflow: hidden;
+}
+
+.progress span {
+  display: block;
+  height: 100%;
+  width: 0;
+  background: var(--accent);
+}
+
+.status {
+  min-height: 18px;
+  margin: 0;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.status.err {
+  color: var(--danger);
+}
+
+footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 12px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+footer button {
+  padding: 4px 8px;
+  border-radius: 8px;
+}

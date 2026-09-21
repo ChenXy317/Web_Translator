@@ -1,0 +1,10 @@
+{
+  "name": "jiyi",
+  "version": "1.1.0",
+  "private": true,
+  "type": "module",
+  "description": "用自己的 OpenAI 兼容模型实时翻译网页的浏览器扩展",
+  "scripts": {
+    "check": "node scripts/check.mjs"
+  }
+}

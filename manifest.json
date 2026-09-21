@@ -1,0 +1,62 @@
+{
+  "manifest_version": 3,
+  "name": "即译",
+  "short_name": "即译",
+  "version": "1.1.0",
+  "description": "用你自己的 OpenAI 兼容模型，实时翻译网页内容。",
+  "minimum_chrome_version": "116",
+  "icons": {
+    "16": "icons/icon16.png",
+    "32": "icons/icon32.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  },
+  "action": {
+    "default_title": "即译",
+    "default_popup": "popup/popup.html",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "32": "icons/icon32.png",
+      "48": "icons/icon48.png"
+    }
+  },
+  "options_ui": {
+    "page": "options/options.html",
+    "open_in_tab": true
+  },
+  "background": {
+    "service_worker": "background/service-worker.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": ["http://*/*", "https://*/*", "file://*/*"],
+      "js": ["content/content.js"],
+      "css": ["content/page.css"],
+      "run_at": "document_idle",
+      "all_frames": true
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["content/*.js", "shared/*.js"],
+      "matches": ["http://*/*", "https://*/*", "file://*/*"]
+    }
+  ],
+  "permissions": ["storage", "contextMenus", "scripting", "activeTab"],
+  "host_permissions": ["<all_urls>"],
+  "commands": {
+    "toggle-translate": {
+      "suggested_key": {
+        "default": "Alt+Shift+Y"
+      },
+      "description": "翻译或还原当前页面"
+    },
+    "translate-selection": {
+      "description": "翻译选中文本"
+    },
+    "translate-input": {
+      "description": "翻译当前输入框"
+    }
+  }
+}

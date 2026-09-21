@@ -1,0 +1,148 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>即译 · 设置</title>
+  <link rel="stylesheet" href="options.css" />
+</head>
+<body>
+  <main>
+    <header>
+      <img src="../icons/icon48.png" alt="" width="40" height="40" />
+      <div>
+        <h1>即译</h1>
+        <p>接入任意 OpenAI 兼容接口，用你自己的模型实时翻译网页。</p>
+      </div>
+    </header>
+
+    <form id="form">
+      <section>
+        <h2>模型服务</h2>
+        <label>
+          预设
+          <select id="preset"></select>
+        </label>
+        <label>
+          Base URL
+          <input id="baseUrl" type="text" placeholder="https://api.x.ai/v1" autocomplete="off" />
+        </label>
+        <p class="hint">填到 <code>/v1</code> 这一层即可，不要带 <code>/chat/completions</code>。</p>
+        <label>
+          API Key
+          <input id="apiKey" type="password" placeholder="sk-..." autocomplete="off" />
+        </label>
+        <label>
+          模型名
+          <input id="model" list="model-list" placeholder="grok-4.5" autocomplete="off" />
+          <datalist id="model-list"></datalist>
+        </label>
+        <div class="row">
+          <button id="load-models" type="button">拉取模型列表</button>
+          <button id="test" type="button">测试连接</button>
+        </div>
+        <p id="test-result" class="hint"></p>
+      </section>
+
+      <section>
+        <h2>翻译行为</h2>
+        <label>
+          目标语言
+          <select id="targetLang"></select>
+        </label>
+        <label class="check"><input id="bilingual" type="checkbox" /> 对照显示原文与译文</label>
+        <label class="check"><input id="hoverOriginal" type="checkbox" /> 悬停译文时显示原文</label>
+        <label class="check"><input id="skipIfTarget" type="checkbox" /> 跳过已经很像目标语言的文本</label>
+        <label class="check"><input id="skipCode" type="checkbox" /> 跳过代码块</label>
+        <label class="check"><input id="translateTitle" type="checkbox" /> 翻译页面标题</label>
+        <label class="check"><input id="translateAttrs" type="checkbox" /> 翻译 alt / title / placeholder / aria-label</label>
+        <label class="check"><input id="inputButton" type="checkbox" /> 输入框旁显示「译」按钮</label>
+        <label class="check"><input id="pauseOnHidden" type="checkbox" /> 标签页隐藏时暂停翻译</label>
+        <label class="check"><input id="autoRetry" type="checkbox" /> 失败后自动重试</label>
+        <label class="check"><input id="jsonMode" type="checkbox" /> 强制 JSON 对象输出（部分接口更稳）</label>
+      </section>
+
+      <section>
+        <h2>站点规则</h2>
+        <label>
+          自动翻译的网站（每行一个域名）
+          <textarea id="autoOrigins" rows="4" placeholder="www.example.com"></textarea>
+        </label>
+        <label>
+          永不翻译的网站（每行一个域名，子域也会匹配）
+          <textarea id="excludeOrigins" rows="4" placeholder="mail.google.com"></textarea>
+        </label>
+        <label>
+          额外跳过的 CSS 选择器（每行一个）
+          <textarea id="skipSelectors" rows="4" placeholder=".notranslate&#10;#comments"></textarea>
+        </label>
+        <label>
+          术语表（每行「原文=译文」）
+          <textarea id="glossary" rows="5" placeholder="OpenAI=OpenAI&#10;attention=注意力"></textarea>
+        </label>
+      </section>
+
+      <section>
+        <h2>界面</h2>
+        <label>
+          进度浮层位置
+          <select id="chipPosition"></select>
+        </label>
+      </section>
+
+      <section>
+        <h2>请求参数</h2>
+        <div class="grid">
+          <label>
+            每批条数
+            <input id="batchSize" type="number" min="1" max="40" />
+          </label>
+          <label>
+            每批最大字符
+            <input id="maxChars" type="number" min="200" max="8000" />
+          </label>
+          <label>
+            最短文本长度
+            <input id="minChars" type="number" min="1" max="40" />
+          </label>
+          <label>
+            每页最多翻译段数
+            <input id="maxNodes" type="number" min="50" max="20000" />
+          </label>
+          <label>
+            Temperature
+            <input id="temperature" type="number" min="0" max="2" step="0.1" />
+          </label>
+          <label>
+            超时（毫秒）
+            <input id="timeoutMs" type="number" min="5000" max="180000" step="1000" />
+          </label>
+        </div>
+        <label>
+          额外请求头（JSON）
+          <textarea id="extraHeaders" rows="3" placeholder='{"HTTP-Referer":"https://localhost"}'></textarea>
+        </label>
+        <label>
+          额外请求体字段（JSON）
+          <textarea id="extraBody" rows="3" placeholder='{"top_p":1}'></textarea>
+        </label>
+        <label>
+          自定义系统提示词（留空则使用内置翻译提示）
+          <textarea id="customPrompt" rows="5" placeholder="将把目标语言名称留给内置提示词处理。"></textarea>
+        </label>
+      </section>
+
+      <div class="toolbar">
+        <button id="save" class="primary" type="submit">保存</button>
+        <button id="clear-cache" type="button">清空译文缓存</button>
+        <button id="export" type="button">导出设置</button>
+        <button id="import" type="button">导入设置</button>
+        <input id="import-file" type="file" accept="application/json" hidden />
+        <span id="save-msg" class="hint"></span>
+      </div>
+      <p id="cache-info" class="hint"></p>
+    </form>
+  </main>
+  <script type="module" src="options.js"></script>
+</body>
+</html>

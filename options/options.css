@@ -1,0 +1,150 @@
+:root {
+  --bg: #090e1a;
+  --elev: #141c31;
+  --line: #243049;
+  --text: #e8eefc;
+  --muted: #8b9bb8;
+  --accent: #3ee0b0;
+  --danger: #ff6b7a;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  background:
+    radial-gradient(1200px 500px at 10% -10%, #16352855, transparent),
+    radial-gradient(900px 400px at 100% 0%, #1c2a5555, transparent),
+    var(--bg);
+  color: var(--text);
+  font: 14px/1.5 "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+
+main {
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 40px 20px 80px;
+}
+
+header {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  margin-bottom: 28px;
+}
+
+header img {
+  border-radius: 12px;
+}
+
+h1 {
+  margin: 0;
+  font-size: 28px;
+  letter-spacing: 0.02em;
+}
+
+header p, .hint {
+  color: var(--muted);
+  margin: 4px 0 0;
+}
+
+section {
+  background: #141c31cc;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  padding: 18px 18px 8px;
+  margin-bottom: 16px;
+}
+
+h2 {
+  margin: 0 0 12px;
+  font-size: 15px;
+  color: var(--accent);
+}
+
+label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+label.check {
+  flex-direction: row;
+  align-items: flex-start;
+  color: var(--text);
+  font-size: 13px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+label.check input {
+  flex: none;
+  margin-top: 3px;
+}
+
+input, select, textarea, button {
+  font: inherit;
+  color: var(--text);
+}
+
+input, select, textarea {
+  background: #0c1222;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 9px 11px;
+}
+
+textarea {
+  resize: vertical;
+  min-height: 72px;
+}
+
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0 12px;
+}
+
+.row, .toolbar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+button {
+  border: 1px solid var(--line);
+  background: var(--elev);
+  border-radius: 10px;
+  padding: 8px 12px;
+  cursor: pointer;
+}
+
+button.primary {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #06281f;
+  font-weight: 650;
+}
+
+code {
+  font-family: ui-monospace, Consolas, monospace;
+  color: var(--accent);
+}
+
+#test-result.err, #save-msg.err {
+  color: var(--danger);
+}
+
+#test-result.ok, #save-msg.ok {
+  color: var(--accent);
+}
+
+@media (max-width: 640px) {
+  .grid { grid-template-columns: 1fr; }
+  main { padding: 24px 14px 60px; }
+}

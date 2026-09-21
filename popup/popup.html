@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>即译</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <header>
+    <img src="../icons/icon32.png" alt="" width="28" height="28" />
+    <div>
+      <strong>即译</strong>
+      <span>实时网页翻译</span>
+    </div>
+  </header>
+
+  <section id="setup" class="card hidden">
+    <p>还没有配置模型。填写任意 OpenAI 兼容接口即可开始。</p>
+    <button id="open-options" class="primary" type="button">去配置模型</button>
+  </section>
+
+  <section id="main" class="hidden">
+    <label class="field">
+      <span>目标语言</span>
+      <select id="lang"></select>
+    </label>
+
+    <div class="actions">
+      <button id="translate" class="primary" type="button">翻译此页</button>
+      <button id="restore" type="button">显示原文</button>
+    </div>
+    <div class="actions">
+      <button id="pause" type="button">暂停</button>
+      <button id="retry" type="button">重试</button>
+    </div>
+    <button id="selection" class="ghost" type="button">翻译选中文本</button>
+    <button id="input" class="ghost" type="button">翻译当前输入框</button>
+
+    <label class="switch">
+      <input id="auto" type="checkbox" />
+      <span>以后打开此网站自动翻译</span>
+    </label>
+    <label class="switch">
+      <input id="exclude" type="checkbox" />
+      <span>永不翻译此网站</span>
+    </label>
+    <label class="switch">
+      <input id="bilingual" type="checkbox" />
+      <span>对照显示原文</span>
+    </label>
+    <label class="switch">
+      <input id="hover" type="checkbox" />
+      <span>悬停查看原文</span>
+    </label>
+
+    <div id="progress" class="progress hidden"><span></span></div>
+    <p id="status" class="status">就绪</p>
+  </section>
+
+  <footer>
+    <button id="settings" type="button">设置</button>
+    <span>Alt+Shift+Y 翻译/还原</span>
+  </footer>
+
+  <script type="module" src="popup.js"></script>
+</body>
+</html>
