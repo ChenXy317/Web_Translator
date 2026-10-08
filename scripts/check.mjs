@@ -4,6 +4,8 @@ import { fileURLToPath } from "node:url";
 import {
   buildSystemPrompt,
   chatCompletionsUrl,
+  completionLimit,
+  isGrokReasoningModel,
   normalizeBaseUrl,
   parseJsonObject,
   parseTranslations,
@@ -39,6 +41,12 @@ assert(
   chatCompletionsUrl("https://api.openai.com/v1") === "https://api.openai.com/v1/chat/completions",
   "chat url"
 );
+assert(isGrokReasoningModel("grok-4.5") && isGrokReasoningModel("grok-4.7-latest"), "grok reasoning");
+assert(!isGrokReasoningModel("grok-4") && !isGrokReasoningModel("grok-4.20") && !isGrokReasoningModel("gpt-4o-mini"), "not grok reasoning");
+assert(completionLimit("grok-4.5", 100).reasoning_effort === "low", "low effort");
+assert(completionLimit("grok-4.5", 100).max_completion_tokens === 100, "completion tokens");
+assert(completionLimit("gpt-4o-mini", 100).max_tokens === 100, "legacy max tokens");
+assert(!completionLimit("gpt-4o-mini", 100).reasoning_effort, "no effort on gpt");
 assert(JSON.stringify(parseTranslations('["a","b"]', 2)) === JSON.stringify(["a", "b"]), "json");
 let shortThrew = false;
 try {

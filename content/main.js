@@ -35,7 +35,7 @@ function boot() {
   if (!shouldRunInFrame()) return;
 
   const ALWAYS_SKIP = new Set([
-    "SCRIPT", "STYLE", "NOSCRIPT", "TEXTAREA",
+    "SCRIPT", "STYLE", "NOSCRIPT", "TEXTAREA", "TEMPLATE",
     "SVG", "MATH", "IFRAME", "OBJECT", "VIDEO", "AUDIO", "CANVAS",
     "INPUT", "SELECT", "OPTION"
   ]);
@@ -86,8 +86,12 @@ function boot() {
   let heartbeat = 0;
   let observer = null;
   let observedRoots = new WeakSet();
+  let boxMemo = new WeakMap();
+  let attrObserver = null;
+  let visibleTimer = 0;
   let scanTimer = 0;
   let mutationBuffer = [];
+  let pendingAttrs = [];
   let ui = null;
   let mutating = false;
   let activePumps = 0;
@@ -212,8 +216,27 @@ function boot() {
     return ui;
   }
 
+  function isExtensionUi(node) {
+    if (!node) return false;
+    const root = typeof node.getRootNode === "function" ? node.getRootNode() : null;
+    if (root?.host?.id === "atp-root") return true;
+    const el = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
+    return Boolean(el?.id === "atp-root" || el?.closest?.("#atp-root"));
+  }
+
+  function isTitleText(node) {
+    const el = node?.nodeType === Node.ELEMENT_NODE ? node : node?.parentElement;
+    return el?.tagName === "TITLE";
+  }
+
+  // 浮层在 Shadow DOM 里，closest 穿不过去；标题由单独请求处理。两者再入队会反复翻译。
+  function shouldIgnoreNode(node) {
+    return isExtensionUi(node) || isTitleText(node);
+  }
+
   function isSkippable(el) {
     if (!el || el.nodeType !== Node.ELEMENT_NODE) return false;
+    if (isExtensionUi(el)) return true;
     if (ALWAYS_SKIP.has(el.tagName)) return true;
     if (state.skipCode && CODE_SKIP.has(el.tagName)) return true;
     if (el.isContentEditable || el.closest("[contenteditable]:not([contenteditable='false'])")) return true;
@@ -232,12 +255,94 @@ function boot() {
     return false;
   }
 
-  function isHidden(el) {
-    if (!el) return true;
-    if (el.hidden || el.getAttribute("aria-hidden") === "true") return true;
+  function ancestorElement(el) {
+    if (el.parentElement) return el.parentElement;
+    const root = el.getRootNode?.();
+    return root?.host || null;
+  }
+
+  function clipsOverflow(st) {
+    return /hidden|clip|scroll|auto/.test(`${st.overflow}${st.overflowX}${st.overflowY}`);
+  }
+
+  // 只认真正画出来的区域。裁切、透明、收起、挪到屏幕左右外侧的文字不翻译。
+  function visibleBox(el) {
+    if (!el || el.nodeType !== Node.ELEMENT_NODE) return null;
+    if (boxMemo.has(el)) return boxMemo.get(el);
+    const reject = () => {
+      boxMemo.set(el, null);
+      return null;
+    };
     const st = window.getComputedStyle(el);
-    if (st.display === "none" || st.visibility === "hidden") return true;
-    return false;
+    if (
+      el.hidden ||
+      el.hasAttribute("inert") ||
+      st.display === "none" ||
+      st.visibility === "hidden" ||
+      st.visibility === "collapse" ||
+      st.contentVisibility === "hidden" ||
+      Number(st.opacity) === 0
+    ) {
+      return reject();
+    }
+    const raw = el.getBoundingClientRect();
+    let rect = { left: raw.left, right: raw.right, top: raw.top, bottom: raw.bottom, width: raw.width, height: raw.height };
+    if (rect.width < 2 || rect.height < 2) return reject();
+    const viewW = window.innerWidth || 800;
+    if (rect.right <= 0 || rect.left >= viewW) return reject();
+    let cur = ancestorElement(el);
+    while (cur && cur !== document.documentElement) {
+      if (cur.hidden || cur.hasAttribute("inert")) return reject();
+      const cs = window.getComputedStyle(cur);
+      if (
+        Number(cs.opacity) === 0 ||
+        cs.visibility === "hidden" ||
+        cs.display === "none" ||
+        cs.contentVisibility === "hidden"
+      ) {
+        return reject();
+      }
+      if (clipsOverflow(cs)) {
+        const c = cur.getBoundingClientRect();
+        const left = Math.max(rect.left, c.left);
+        const right = Math.min(rect.right, c.right);
+        const top = Math.max(rect.top, c.top);
+        const bottom = Math.min(rect.bottom, c.bottom);
+        if (right - left < 2 || bottom - top < 2) return reject();
+        rect = { left, right, top, bottom, width: right - left, height: bottom - top };
+      }
+      cur = ancestorElement(cur);
+    }
+    boxMemo.set(el, rect);
+    return rect;
+  }
+
+  function inViewBand(box) {
+    const h = window.innerHeight || 800;
+    const w = window.innerWidth || 800;
+    return box.bottom > -h * 0.15 && box.top < h * 1.6 && box.right > 0 && box.left < w;
+  }
+
+  function rankOf(node) {
+    if (node._kind === "attr") return -8000;
+    const el = node.parentElement;
+    if (!el?.getBoundingClientRect) return -1e9;
+    const rect = el.getBoundingClientRect();
+    const len = String(node.nodeValue || "").trim().length;
+    const w = window.innerWidth || 1;
+    const h = window.innerHeight || 1;
+    const cx = (rect.left + rect.right) / 2;
+    const cy = (rect.top + rect.bottom) / 2;
+    const corner = ((cx - w / 2) / w) ** 2 + ((cy - h / 2) / h) ** 2;
+    let score = Math.min(len, 480) * 10;
+    if (el.closest("main, article, [role='main']")) score += 8000;
+    if (el.closest("p, h1, h2, h3, h4, h5, h6, li, blockquote, td, figcaption, dd")) score += 3000;
+    if (el.closest("nav, header, footer, aside, [role='navigation'], [role='banner'], [role='contentinfo'], [role='complementary']")) {
+      score -= 9000;
+    }
+    if (rect.top > h || rect.bottom < 0) score -= 5000;
+    score -= corner * 5000;
+    return score;
   }
 
   function queryAllDeep(root, sel, out = []) {
@@ -261,28 +366,23 @@ function boot() {
     };
   }
 
-  function nearViewport(node) {
-    const el = node.parentElement || (node.nodeType === Node.ELEMENT_NODE ? node : null);
-    if (!el || !el.getBoundingClientRect) return false;
-    const r = el.getBoundingClientRect();
-    const vh = window.innerHeight || 800;
-    return r.bottom >= -240 && r.top <= vh + 900;
-  }
-
   function collectTextNodes(root, nearbyOnly) {
     const nodes = [];
     const visit = (base) => {
       const walker = document.createTreeWalker(base, NodeFilter.SHOW_TEXT, {
         acceptNode(node) {
           if (!node.nodeValue || shouldSkipText(node.nodeValue, skipOptions())) return NodeFilter.FILTER_REJECT;
+          if (shouldIgnoreNode(node)) return NodeFilter.FILTER_REJECT;
           const parent = node.parentElement;
-          if (!parent || isSkippable(parent) || isHidden(parent)) return NodeFilter.FILTER_REJECT;
+          if (!parent || isSkippable(parent)) return NodeFilter.FILTER_REJECT;
+          const box = visibleBox(parent);
+          if (!box) return NodeFilter.FILTER_REJECT;
+          if (nearbyOnly && !inViewBand(box)) return NodeFilter.FILTER_REJECT;
           try {
             if (parent.closest(skipSel())) return NodeFilter.FILTER_REJECT;
           } catch {
             /* ignore */
           }
-          if (nearbyOnly && !nearViewport(node)) return NodeFilter.FILTER_REJECT;
           const rec = records.get(node);
           if (rec?.status === "done" && node.nodeValue === rec.translated) return NodeFilter.FILTER_REJECT;
           return NodeFilter.FILTER_ACCEPT;
@@ -295,7 +395,8 @@ function boot() {
       }
       const els = base.querySelectorAll ? base.querySelectorAll("*") : [];
       for (const el of els) {
-        if (el.shadowRoot) visit(el.shadowRoot);
+        if (el.id === "atp-root" || !el.shadowRoot) continue;
+        visit(el.shadowRoot);
       }
     };
     visit(root);
@@ -306,7 +407,7 @@ function boot() {
     if (!state.translateAttrs || !root.querySelectorAll) return [];
     const out = [];
     for (const el of root.querySelectorAll("*")) {
-      if (isSkippable(el) || isHidden(el)) continue;
+      if (el.id === "atp-root" || isExtensionUi(el) || isSkippable(el) || !visibleBox(el)) continue;
       for (const attr of TRANSLATABLE_ATTRS) {
         const value = el.getAttribute(attr);
         if (!value || shouldSkipText(value, skipOptions())) continue;
@@ -319,9 +420,13 @@ function boot() {
   function enqueue(nodes) {
     let added = 0;
     for (const node of nodes) {
-      if (queuedTotal >= state.maxNodes) break;
+      if (shouldIgnoreNode(node)) continue;
       if (queued.has(node) || inflight.has(node)) continue;
       if (!node.parentNode) continue;
+      const host = node.parentElement;
+      const box = host ? visibleBox(host) : null;
+      if (!box) continue;
+      if (!inViewBand(box) && queuedTotal >= state.maxNodes) continue;
       const rec = records.get(node);
       if (rec?.status === "done" && rec.translated === node.nodeValue) continue;
       queued.add(node);
@@ -340,6 +445,7 @@ function boot() {
     let added = 0;
     for (const item of items) {
       if (queuedTotal >= state.maxNodes) break;
+      if (shouldIgnoreNode(item.el)) continue;
       let seen = seenAttrs.get(item.el);
       if (!seen) {
         seen = new Set();
@@ -364,14 +470,7 @@ function boot() {
   }
 
   function takeBatch() {
-    const visible = [];
-    const rest = [];
-    for (const node of queued) {
-      const probe = node.nodeType === Node.TEXT_NODE ? node : node.el;
-      if (probe && nearViewport(probe)) visible.push(node);
-      else rest.push(node);
-    }
-    const ordered = visible.concat(rest);
+    const ordered = [...queued].sort((a, b) => rankOf(b) - rankOf(a));
     const batch = [];
     let chars = 0;
     for (const node of ordered) {
@@ -604,8 +703,19 @@ function boot() {
     reportStatus();
   }
 
+  function scheduleVisibleScan() {
+    if (!state.enabled || state.paused) return;
+    clearTimeout(visibleTimer);
+    visibleTimer = setTimeout(() => {
+      visibleTimer = 0;
+      boxMemo = new WeakMap();
+      scanAndQueue(true);
+    }, 180);
+  }
+
   function scanAndQueue(nearbyOnly) {
     if (!state.enabled || state.paused) return;
+    boxMemo = new WeakMap();
     const root = document.body || document.documentElement;
     if (!root) return;
     enqueue(collectTextNodes(root, nearbyOnly));
@@ -624,15 +734,14 @@ function boot() {
 
   function watchShadows(root) {
     if (!root) return;
-    if (root.shadowRoot) {
+    if (root.id !== "atp-root" && root.shadowRoot) {
       observeRoot(root.shadowRoot);
       watchShadows(root.shadowRoot);
     }
     root.querySelectorAll?.("*")?.forEach((el) => {
-      if (el.shadowRoot) {
-        observeRoot(el.shadowRoot);
-        watchShadows(el.shadowRoot);
-      }
+      if (el.id === "atp-root" || !el.shadowRoot) return;
+      observeRoot(el.shadowRoot);
+      watchShadows(el.shadowRoot);
     });
   }
 
@@ -644,9 +753,11 @@ function boot() {
       const found = [];
       const attrs = [];
       for (const m of mutations) {
+        if (shouldIgnoreNode(m.target)) continue;
         if (m.type === "characterData") {
           const node = m.target;
           if (node.nodeType !== Node.TEXT_NODE) continue;
+          if (!visibleBox(node.parentElement)) continue;
           const rec = records.get(node);
           if (rec && node.nodeValue !== rec.original && node.nodeValue !== rec.translated) {
             rec.original = node.nodeValue;
@@ -658,6 +769,7 @@ function boot() {
           }
         } else if (m.addedNodes && m.addedNodes.length) {
           m.addedNodes.forEach((n) => {
+            if (shouldIgnoreNode(n)) return;
             if (n.nodeType === Node.TEXT_NODE) found.push(n);
             else if (n.nodeType === Node.ELEMENT_NODE) {
               watchShadows(n);
@@ -669,24 +781,39 @@ function boot() {
       }
       if (found.length || attrs.length) {
         mutationBuffer.push(...found);
+        pendingAttrs.push(...attrs);
         clearTimeout(startObserver._t);
         startObserver._t = setTimeout(() => {
           const nodes = mutationBuffer;
+          const attrItems = pendingAttrs;
           mutationBuffer = [];
+          pendingAttrs = [];
           enqueue(nodes);
-          if (attrs.length) enqueueAttrs(attrs);
+          if (attrItems.length) enqueueAttrs(attrItems);
         }, 280);
       }
     });
     observeRoot(document.documentElement);
     watchShadows(document.documentElement);
+    attrObserver?.disconnect();
+    attrObserver = new MutationObserver(() => scheduleVisibleScan());
+    attrObserver.observe(document.documentElement, {
+      subtree: true,
+      attributes: true,
+      attributeFilter: ["class", "style", "hidden", "open", "aria-hidden", "inert"]
+    });
   }
 
   function stopObserver() {
     observer?.disconnect();
     observer = null;
+    attrObserver?.disconnect();
+    attrObserver = null;
+    clearTimeout(visibleTimer);
+    visibleTimer = 0;
     observedRoots = new WeakSet();
     mutationBuffer = [];
+    pendingAttrs = [];
     clearTimeout(startObserver._t);
   }
 
@@ -773,8 +900,11 @@ function boot() {
     }
     reportStatus();
     setTimeout(() => {
+      if (state.enabled) scanAndQueue(true);
+    }, 400);
+    setTimeout(() => {
       if (state.enabled) scanAndQueue(false);
-    }, 200);
+    }, 900);
   }
 
   function selectionPoint() {
@@ -900,8 +1030,12 @@ function boot() {
     }
   }, { passive: true });
 
-  window.addEventListener("scroll", () => {
-    if (state.enabled && queued.size) schedulePump();
+  document.addEventListener("scroll", () => {
+    if (!state.enabled || state.paused) return;
+    scheduleVisibleScan();
+  }, { passive: true, capture: true });
+  window.addEventListener("resize", () => {
+    if (state.enabled) scheduleVisibleScan();
   }, { passive: true });
 
   document.addEventListener("visibilitychange", () => {

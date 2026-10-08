@@ -1,6 +1,6 @@
 import { parseGlossary, applyExactGlossary, emptyToOriginal } from "../shared/text.js";
 import { cacheKey, getCacheStore, getSettings, putCacheEntries } from "../shared/storage.js";
-import { listModels, testConnection, translateTexts, withRetries } from "../shared/openai.js";
+import { listModels, testConnection, translateReliably, withRetries } from "../shared/openai.js";
 import { isTranslatableUrl } from "../shared/site.js";
 
 const tabState = new Map();
@@ -63,10 +63,10 @@ async function translateWithCache(texts, settings) {
   const translated = await limit(() =>
     withRetries(async (attempt) => {
       try {
-        return await translateTexts(unique, settings);
+        return await translateReliably(unique, settings);
       } catch (err) {
         if (attempt === 0 && /无法解析|JSON/.test(err.message || "")) {
-          return translateTexts(unique, {
+          return translateReliably(unique, {
             ...settings,
             jsonMode: true,
             customPrompt: `${settings.customPrompt || ""}\n只输出 JSON 对象 {"translations":["译文1","译文2"]}。`.trim()

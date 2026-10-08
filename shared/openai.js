@@ -16,6 +16,20 @@ export function modelsUrl(baseUrl) {
   return `${normalizeBaseUrl(baseUrl)}/models`;
 }
 
+/** grok-4.5 及之后默认高强度推理，网页翻译改走低强度，避免思考占满时限。 */
+export function isGrokReasoningModel(model) {
+  const name = String(model || "");
+  return /grok-4\.(5|6|7)(?:[^0-9]|$)/i.test(name) || /grok-build/i.test(name);
+}
+
+export function completionLimit(model, maxTokens) {
+  if (!maxTokens) return {};
+  if (isGrokReasoningModel(model)) {
+    return { max_completion_tokens: maxTokens, reasoning_effort: "low" };
+  }
+  return { max_tokens: maxTokens };
+}
+
 export function parseJsonObject(raw, fallback = {}) {
   const text = String(raw || "").trim();
   if (!text) return fallback;
@@ -188,12 +202,16 @@ export async function requestChatCompletions({
     model,
     messages,
     temperature: Number.isFinite(temperature) ? temperature : 0.2,
+    ...completionLimit(model, maxTokens),
     ...extra,
-    ...(maxTokens ? { max_tokens: maxTokens } : {}),
     ...(jsonMode ? { response_format: { type: "json_object" } } : {}),
     stream: false
   };
 
+  return postChat(baseUrl, headers, body, timeoutMs);
+}
+
+async function postChat(baseUrl, headers, body, timeoutMs, retried) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs || 60000);
   let res;
@@ -221,19 +239,26 @@ export async function requestChatCompletions({
 
   if (!res.ok) {
     const retryAfter = res.headers?.get?.("retry-after") || "";
-    if (res.status === 429) {
-      const error = new Error("请求过于频繁，请稍后再试");
-      error.status = 429;
-      error.retryAfter = retryAfter;
-      throw error;
-    }
     const msg =
       data?.error?.message ||
       data?.error ||
       data?.message ||
       raw.slice(0, 240) ||
       `HTTP ${res.status}`;
-    const error = new Error(typeof msg === "string" ? msg : JSON.stringify(msg));
+    const text = typeof msg === "string" ? msg : JSON.stringify(msg);
+    if (!retried && res.status === 400 && /reasoning_effort|max_completion_tokens|unsupported parameter/i.test(text)) {
+      const next = { ...body, max_tokens: body.max_completion_tokens || body.max_tokens };
+      delete next.reasoning_effort;
+      delete next.max_completion_tokens;
+      return postChat(baseUrl, headers, next, timeoutMs, true);
+    }
+    if (res.status === 429) {
+      const error = new Error("请求过于频繁，请稍后再试");
+      error.status = 429;
+      error.retryAfter = retryAfter;
+      throw error;
+    }
+    const error = new Error(text);
     error.status = res.status;
     error.retryAfter = retryAfter;
     throw error;
@@ -267,6 +292,21 @@ export async function translateTexts(texts, settings) {
     }));
   }
   return parseTranslations(text, texts.length);
+}
+
+/** 整批无法解析时改为逐条请求。单条结果允许是纯文本。 */
+export async function translateReliably(texts, settings) {
+  try {
+    return await translateTexts(texts, settings);
+  } catch (err) {
+    if (!(texts.length > 1 && /无法解析|JSON/.test(err?.message || ""))) throw err;
+    const out = [];
+    for (const text of texts) {
+      const [one] = await translateTexts([text], settings);
+      out.push(one);
+    }
+    return out;
+  }
 }
 
 function retryWaitMs(err, attempt) {

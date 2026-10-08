@@ -1,6 +1,7 @@
 export function createUi(handlers) {
   const host = document.createElement("div");
   host.id = "atp-root";
+  host.setAttribute("translate", "no");
   host.style.all = "initial";
   host.style.position = "fixed";
   host.style.zIndex = "2147483646";
